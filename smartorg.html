@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Organiser</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* --- iOS 27 / Glassmorphism Theme Base --- */
+        :root {
+            --glass-border: 1px solid rgba(255, 255, 255, 0.15);
+            --glass-bg: rgba(20, 20, 30, 0.65);
+            --glass-bg-dark: rgba(10, 10, 15, 0.85);
+            --neon-primary: #5e9eff;
+            --ease-ios: cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        body {
+            background-color: #050505;
+            font-family: 'Inter', sans-serif;
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            user-select: none; /* OS-like feel */
+        }
+
+        /* --- Dynamic Background --- */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.6;
+            animation: float 20s infinite ease-in-out alternate;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .orb-1 { width: 40vw; height: 40vw; background: #3b0764; top: -10%; left: -10%; }
+        .orb-2 { width: 35vw; height: 35vw; background: #1e3a8a; bottom: -5%; right: -5%; animation-delay: -5s; }
+        .orb-3 { width: 20vw; height: 20vw; background: #be185d; top: 40%; left: 40%; animation-delay: -10s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(30px, 50px) scale(1.1); }
+        }
+
+        /* --- Glass Components --- */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: var(--glass-border);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05);
+        }
+
+        .glass-element {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.2s var(--ease-ios);
+        }
+
+        .glass-element:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .glass-input:focus {
+            outline: none;
+            border-color: var(--neon-primary);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- Window System --- */
+        .os-window {
+            position: absolute;
+            background: var(--glass-bg-dark);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(50px);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-col: column;
+            overflow: hidden;
+            transition: transform 0.1s, opacity 0.2s, width 0.2s, height 0.2s;
+            animation: windowOpen 0.4s var(--ease-ios);
+            min-width: 300px;
+            min-height: 200px;
+        }
+
+        .window-header {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 16px;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .window-content {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+        }
+
+        @keyframes windowOpen {
+            from { opacity: 0; transform: scale(0.95) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* --- Context Menu --- */
+        #context-menu {
+            position: absolute;
+            z-index: 9999;
+            width: 180px;
+            background: rgba(20, 20, 30, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 6px;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: fadeIn 0.1s ease;
+        }
+
+        .ctx-item {
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.8);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .ctx-item:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .ctx-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 4px 0;
+        }
+
+        /* --- Animations & Utilities --- */
+        .drop-zone-active {
+            background: rgba(94, 158, 255, 0.15) !important;
+            border-color: rgba(94, 158, 255, 0.5) !important;
+            box-shadow: inset 0 0 20px rgba(94, 158, 255, 0.2);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Full Screen Cover for Auth/Modal */
+        #auth-screen, #modal-overlay { transition: opacity 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="antialiased selection:bg-blue-500 selection:text-white" onclick="hideContextMenu()">
+
+    <!-- Background Orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+
+    <!-- CONTEXT MENU -->
+    <div id="context-menu" onclick="event.stopPropagation()">
+        <div class="ctx-item" onclick="triggerCtxAction('open')">
+            <i class="ph ph-arrow-square-out"></i> Open
+        </div>
+        <div class="ctx-item" onclick="triggerCtxAction('rename')">
+            <i class="ph ph-pencil-simple"></i> Rename
+        </div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-item" onclick="triggerCtxAction('archive')">
+            <i class="ph ph-archive"></i> Archive
+        </div>
+        <div class="ctx-item" onclick="triggerCtxAction('download')">
+            <i class="ph ph-download-simple"></i> Download
+        </div>
+        <div class="ctx-item" onclick="triggerCtxAction('share')">
+            <i class="ph ph-share-network"></i> Share
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY (Rename) -->
+    <div id="modal-overlay" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm hidden">
+        <div class="glass-panel w-full max-w-sm p-6 rounded-2xl relative">
+            <h3 class="text-lg font-medium mb-4" id="modal-title">Rename File</h3>
+            <input type="text" id="modal-input" class="w-full px-4 py-3 rounded-xl glass-input text-sm mb-4" />
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition">Cancel</button>
+                <button onclick="confirmModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition shadow-lg shadow-blue-500/20">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md p-8 rounded-3xl text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+            
+            <div class="w-20 h-20 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-xl shadow-blue-500/20">
+                <i class="ph ph-fingerprint text-4xl text-white"></i>
+            </div>
+            
+            <h1 class="text-3xl font-bold mb-2">Smart organiser</h1>
+            <p class="text-white/40 text-sm mb-8">Secure File Environment v27.0</p>
+
+            <div class="space-y-4">
+                <input type="text" placeholder="Username" class="w-full px-4 py-3 rounded-xl glass-input text-sm placeholder-white/30" />
+                <input type="password" placeholder="Password" class="w-full px-4 py-3 rounded-xl glass-input text-sm placeholder-white/30" />
+                
+                <button class="w-full py-3 bg-white text-black font-semibold rounded-xl hover:bg-gray-100 transition shadow-lg shadow-white/10 mt-2">
+                    Sign In
+                </button>
+                
+                <div class="relative py-2">
+                    <div class="absolute inset-0 flex items-center"><span class="w-full border-t border-white/10"></span></div>
+                    <div class="relative flex justify-center text-xs uppercase"><span class="bg-[#1e1e2d]/0 px-2 text-white/30 backdrop-blur-sm">Or</span></div>
+                </div>
+
+                <button onclick="loginAsGuest()" class="w-full py-3 glass-element rounded-xl text-white/80 font-medium hover:text-white flex items-center justify-center gap-2 group">
+                    <span>Continue as Guest</span>
+                    <i class="ph ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DESKTOP APP -->
+    <div id="desktop-app" class="relative z-10 h-full flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto opacity-0 scale-95 transition-all duration-700 pointer-events-none">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20 cursor-pointer hover:rotate-12 transition-transform" onclick="resetDemo()">
+                    <i class="ph ph-hexagon text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-semibold tracking-tight">File Manager</h1>
+                    <p class="text-xs text-white/40">Guest Session • Read/Write</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <input type="file" id="file-upload" class="hidden" multiple onchange="handleFileUpload(this)">
+                <button onclick="document.getElementById('file-upload').click()" class="glass-element px-4 py-2 rounded-full text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white flex items-center gap-2 transition-all">
+                    <i class="ph ph-upload-simple"></i> Upload
+                </button>
+                <button onclick="autoOrganize()" class="bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 backdrop-blur-md px-5 py-2 rounded-full text-sm font-semibold text-blue-100 transition-all shadow-lg hover:shadow-blue-500/20 flex items-center gap-2 group">
+                    <i class="ph ph-sparkle text-blue-300 group-hover:rotate-12 transition-transform"></i>
+                    Smart Sort
+                </button>
+            </div>
+        </header>
+
+        <!-- Workspace Grid -->
+        <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 relative">
+            
+            <!-- Window Layer (Absolute) - Where opened apps go -->
+            <div id="window-layer" class="absolute inset-0 pointer-events-none z-50 overflow-hidden">
+                <!-- Windows injected here -->
+            </div>
+
+            <!-- Left Panel: The Chaos (Unsorted Files / Desktop) -->
+            <section class="lg:col-span-8 flex flex-col gap-4 min-h-0 h-full">
+                <div class="glass-panel flex-1 rounded-[2rem] p-6 flex flex-col relative overflow-hidden transition-all duration-500">
+                    <div class="flex justify-between items-center mb-6 z-10">
+                        <h2 class="text-xl font-medium flex items-center gap-2">
+                            <i class="ph ph-desktop text-blue-400"></i> Desktop
+                            <span id="file-count" class="bg-white/10 text-xs px-2 py-0.5 rounded-full text-white/60">0</span>
+                        </h2>
+                    </div>
+
+                    <!-- Scrollable File Area -->
+                    <div id="unsorted-container" 
+                         class="flex-1 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4 overflow-y-auto no-scrollbar content-start pb-20 p-2 min-h-[200px]"
+                         ondragover="allowDrop(event)" 
+                         ondrop="handleDropOnView(event, 'desktop')">
+                        <!-- Files injected by JS -->
+                    </div>
+
+                    <div class="absolute bottom-6 right-6 text-xs text-white/20 pointer-events-none">
+                        Drag & Drop Zone
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: The Structure (Folders/Drives) -->
+            <section class="lg:col-span-4 flex flex-col gap-4 min-h-0 h-full">
+                <div class="glass-panel flex-1 rounded-[2rem] p-6 overflow-y-auto no-scrollbar flex flex-col">
+                    <h2 class="text-xl font-medium mb-6 flex items-center gap-2">
+                        <i class="ph ph-hard-drives text-purple-400"></i> Drives
+                    </h2>
+                    
+                    <div class="space-y-3 flex-1" id="folder-container">
+                        <!-- Folders Injected by JS -->
+                    </div>
+
+                    <!-- Usage Widget -->
+                    <div class="mt-auto pt-6">
+                        <div class="glass-element p-4 rounded-xl">
+                            <div class="flex justify-between text-xs mb-2">
+                                <span class="text-white/60">iCloud Drive</span>
+                                <span class="text-white/90">84% Used</span>
+                            </div>
+                            <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                <div class="bg-gradient-to-r from-blue-500 to-purple-500 h-full w-[84%]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-container" class="fixed bottom-8 right-8 flex flex-col gap-3 z-[150] pointer-events-none"></div>
+
+    <script>
+        // --- Data & State ---
+        let zIndexCounter = 100;
+        let activeCtxFileId = null; // ID of file currently right-clicked
+        let modalCallback = null; // Function to run when modal confirmed
+
+        const folders = [
+            { id: 'docs', name: 'Documents', icon: 'file-text', type: 'doc', color: 'text-blue-400', bg: 'bg-blue-500/20' },
+            { id: 'imgs', name: 'Images', icon: 'image', type: 'image', color: 'text-purple-400', bg: 'bg-purple-500/20' },
+            { id: 'code', name: 'Development', icon: 'code', type: 'code', color: 'text-green-400', bg: 'bg-green-500/20' },
+            { id: 'misc', name: 'Archive', icon: 'archive', type: 'misc', color: 'text-gray-400', bg: 'bg-gray-500/20' }
+        ];
+
+        // All files are stored here, 'folderId' determines where they live. 'desktop' is default.
+        let allFiles = [
+            { id: 101, folderId: 'desktop', name: 'Project_Alpha.txt', type: 'doc', size: '2 KB', content: 'Project Alpha\n\nStatus: Ongoing\nDeadline: Q4 2026' },
+            { id: 102, folderId: 'desktop', name: 'Mountain_View.jpg', type: 'image', size: '4.1 MB', src: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=500&q=80' },
+            { id: 104, folderId: 'desktop', name: 'main_script.js', type: 'code', size: '14 KB', content: 'function init() { console.log("System Ready"); }' },
+            { id: 105, folderId: 'imgs', name: 'Avatar.png', type: 'image', size: '200 KB', src: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80' },
+            { id: 106, folderId: 'docs', name: 'todo_list.txt', type: 'doc', size: '1 KB', content: '- Buy groceries\n- Update website' },
+            { id: 108, folderId: 'code', name: 'style.css', type: 'code', size: '5 KB', content: '.glass { backdrop-filter: blur(20px); }' },
+        ];
+
+        // --- DOM Elements ---
+        const unsortedContainer = document.getElementById('unsorted-container');
+        const folderContainer = document.getElementById('folder-container');
+        const fileCountDisplay = document.getElementById('file-count');
+        const windowLayer = document.getElementById('window-layer');
+        const contextMenu = document.getElementById('context-menu');
+
+        // --- Auth Logic ---
+        function loginAsGuest() {
+            const authScreen = document.getElementById('auth-screen');
+            const desktopApp = document.getElementById('desktop-app');
+            
+            authScreen.style.opacity = '0';
+            authScreen.style.transform = 'scale(0.9)';
+            
+            setTimeout(() => {
+                authScreen.style.display = 'none';
+                desktopApp.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+                refreshAllViews();
+                showToast("Welcome, Guest User");
+            }, 600);
+        }
+
+        // --- Core Rendering System ---
+        function refreshAllViews() {
+            renderDesktop();
+            renderSidebar();
+            // Refresh any open folder windows
+            document.querySelectorAll('.os-window[data-type="folder"]').forEach(win => {
+                const folderId = win.dataset.folderId;
+                renderWindowContent(win, folderId);
+            });
+        }
+
+        function renderDesktop() {
+            const desktopFiles = allFiles.filter(f => f.folderId === 'desktop');
+            renderFileGrid(unsortedContainer, desktopFiles);
+            fileCountDisplay.innerText = desktopFiles.length;
+        }
+
+        function renderSidebar() {
+            folderContainer.innerHTML = '';
+            
+            folders.forEach(folder => {
+                // Count files in this folder
+                const count = allFiles.filter(f => f.folderId === folder.id).length;
+                
+                const el = document.createElement('div');
+                el.className = 'glass-element p-4 rounded-2xl flex items-center justify-between transition-all duration-300 cursor-pointer hover:bg-white/10';
+                
+                el.innerHTML = `
+                    <div class="flex items-center gap-4 pointer-events-none">
+                        <div class="w-10 h-10 rounded-xl ${folder.bg} flex items-center justify-center shadow-inner shadow-white/10">
+                            <i class="ph ph-${folder.icon} text-xl ${folder.color}"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-white/90">${folder.name}</p>
+                            <p class="text-xs text-white/40"><span class="folder-count">${count}</span> items</p>
+                        </div>
+                    </div>
+                    <i class="ph ph-arrow-square-out text-white/20 group-hover:text-white/60"></i>
+                `;
+
+                // Click to Open Window
+                el.onclick = () => openDriveWindow(folder.id);
+
+                // Drag Events
+                el.addEventListener('dragover', (e) => {
+                    e.preventDefault(); 
+                    e.dataTransfer.dropEffect = 'move';
+                    el.classList.add('drop-zone-active');
+                });
+                el.addEventListener('dragleave', () => el.classList.remove('drop-zone-active'));
+                el.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    el.classList.remove('drop-zone-active');
+                    handleDropOnView(e, folder.id);
+                });
+
+                folderContainer.appendChild(el);
+            });
+        }
+
+        // --- Helper: Generate File Icons HTML ---
+        function renderFileGrid(container, files) {
+            container.innerHTML = '';
+            if (files.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full flex flex-col items-center justify-center text-white/30 h-full min-h-[150px] pointer-events-none">
+                        <i class="ph ph-ghost text-4xl mb-2"></i>
+                        <p>Empty</p>
+                    </div>`;
+                return;
+            }
+
+            files.forEach(file => {
+                const el = document.createElement('div');
+                el.className = 'glass-element p-3 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer relative group transition-all duration-200 hover:bg-white/10';
+                el.draggable = true;
+                el.dataset.id = file.id;
+                
+                // Events
+                el.onclick = (e) => { e.stopPropagation(); openFilePreview(file.id); };
+                el.oncontextmenu = (e) => showContextMenu(e, file.id);
+                el.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', file.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                    el.style.opacity = '0.5';
+                });
+                el.addEventListener('dragend', () => el.style.opacity = '1');
+
+                // Icon logic
+                const iconClass = getIconForType(file.type);
+                
+                el.innerHTML = `
+                    <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform pointer-events-none">
+                        <i class="ph ${iconClass} text-2xl text-white/80"></i>
+                    </div>
+                    <div class="text-center w-full overflow-hidden pointer-events-none">
+                        <p class="text-[11px] font-medium truncate w-full text-white/90">${file.name}</p>
+                        <p class="text-[9px] text-white/40 mt-0.5">${file.size}</p>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        // --- Window System ---
+        function openDriveWindow(folderId) {
+            const folder = folders.find(f => f.id === folderId);
+            const winId = `win-drive-${folderId}`;
+
+            // Focus if exists
+            if (document.getElementById(winId)) {
+                bringToFront(document.getElementById(winId));
+                return;
+            }
+
+            createWindow(winId, folder.name, folderId, 'folder');
+        }
+
+        function openFilePreview(fileId) {
+            const file = allFiles.find(f => f.id == fileId);
+            if (!file) return;
+
+            const winId = `win-file-${fileId}`;
+            if (document.getElementById(winId)) {
+                bringToFront(document.getElementById(winId));
+                return;
+            }
+
+            const win = createWindow(winId, file.name, null, 'file');
+            const contentDiv = win.querySelector('.window-content');
+            
+            // Preview Content
+            if (file.type === 'image' && file.src) {
+                contentDiv.innerHTML = `<img src="${file.src}" class="w-full h-full object-contain pointer-events-none">`;
+                contentDiv.classList.add('p-0', 'bg-black');
+            } else {
+                contentDiv.innerHTML = `<pre class="p-4 font-mono text-xs text-green-400 whitespace-pre-wrap">${file.content || 'Binary File'}</pre>`;
+            }
+        }
+
+        function createWindow(id, title, folderId, type) {
+            const win = document.createElement('div');
+            win.id = id;
+            win.className = 'os-window glass-panel flex flex-col pointer-events-auto';
+            win.dataset.type = type; // 'folder' or 'file'
+            if (folderId) win.dataset.folderId = folderId;
+
+            // Random position for "stacking" effect
+            const offset = Math.random() * 50;
+            win.style.left = `${20 + offset}px`;
+            win.style.top = `${50 + offset}px`;
+            win.style.width = '450px';
+            win.style.height = '350px';
+            win.style.zIndex = ++zIndexCounter;
+
+            win.innerHTML = `
+                <div class="window-header" onmousedown="startDrag(event, '${id}')">
+                    <div class="flex items-center gap-2">
+                        <i class="ph ${type === 'folder' ? 'ph-folder-open' : 'ph-file'} text-white/60"></i>
+                        <span class="text-sm font-medium text-white/90">${title}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="closeWindow('${id}')" class="w-3 h-3 rounded-full bg-red-500/50 hover:bg-red-500 transition-colors"></button>
+                    </div>
+                </div>
+                <div class="window-content ${type === 'folder' ? 'p-2' : ''}">
+                    <!-- Content Injected Later -->
+                </div>
+            `;
+
+            // If folder, set up drop zone
+            if (type === 'folder') {
+                const content = win.querySelector('.window-content');
+                content.classList.add('grid', 'grid-cols-3', 'gap-2', 'content-start', 'overflow-y-auto');
+                
+                // Allow Drop
+                content.ondragover = (e) => {
+                    e.preventDefault();
+                    content.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                };
+                content.ondragleave = () => content.style.backgroundColor = '';
+                content.ondrop = (e) => {
+                    e.preventDefault();
+                    content.style.backgroundColor = '';
+                    handleDropOnView(e, folderId);
+                };
+
+                // Initial Render
+                renderWindowContent(win, folderId);
+            }
+
+            windowLayer.appendChild(win);
+            win.onmousedown = () => bringToFront(win);
+            return win;
+        }
+
+        function renderWindowContent(win, folderId) {
+            const content = win.querySelector('.window-content');
+            const folderFiles = allFiles.filter(f => f.folderId === folderId);
+            renderFileGrid(content, folderFiles);
+        }
+
+        function closeWindow(id) {
+            const win = document.getElementById(id);
+            if (win) {
+                win.style.opacity = '0';
+                win.style.transform = 'scale(0.9)';
+                setTimeout(() => win.remove(), 200);
+            }
+        }
+
+        // --- Drag & Drop Logic (Core) ---
+        function handleDropOnView(e, targetFolderId) {
+            e.stopPropagation(); // Stop bubbling
+            const fileId = e.dataTransfer.getData('text/plain');
+            
+            // Check if it's an internal file move
+            if (fileId) {
+                moveFile(fileId, targetFolderId);
+            } else {
+                // External OS Drop
+                const files = Array.from(e.dataTransfer.files);
+                if (files.length > 0) processNewFiles(files, targetFolderId);
+            }
+        }
+
+        function moveFile(fileId, targetFolderId) {
+            const fileIndex = allFiles.findIndex(f => f.id == fileId);
+            if (fileIndex === -1) return;
+
+            const file = allFiles[fileIndex];
+            
+            // Don't move if already there
+            if (file.folderId === targetFolderId) return;
+
+            file.folderId = targetFolderId;
+            
+            // Animation for source element? (Skipped for complexity, just refresh)
+            refreshAllViews();
+            
+            // Get folder name for toast
+            const folderName = targetFolderId === 'desktop' ? 'Desktop' : folders.find(f => f.id === targetFolderId).name;
+            showToast(`Moved to ${folderName}`);
+        }
+
+        function allowDrop(e) {
+            e.preventDefault();
+        }
+
+        // --- Context Menu Logic ---
+        function showContextMenu(e, fileId) {
+            e.preventDefault();
+            e.stopPropagation();
+            activeCtxFileId = fileId;
+            
+            // Position
+            contextMenu.style.left = `${e.clientX}px`;
+            contextMenu.style.top = `${e.clientY}px`;
+            contextMenu.style.display = 'block';
+        }
+
+        function hideContextMenu() {
+            contextMenu.style.display = 'none';
+        }
+
+        function triggerCtxAction(action) {
+            const file = allFiles.find(f => f.id == activeCtxFileId);
+            if (!file) return;
+
+            hideContextMenu();
+
+            if (action === 'open') openFilePreview(file.id);
+            if (action === 'rename') openRenameModal(file);
+            if (action === 'archive') moveFile(file.id, 'misc');
+            if (action === 'download') downloadFile(file);
+            if (action === 'share') shareFile(file);
+        }
+
+        // --- Features: Rename, Download, Share ---
+        function openRenameModal(file) {
+            const overlay = document.getElementById('modal-overlay');
+            const input = document.getElementById('modal-input');
+            input.value = file.name;
+            overlay.classList.remove('hidden');
+            input.focus();
+            input.select();
+
+            modalCallback = () => {
+                const newName = input.value.trim();
+                if (newName) {
+                    file.name = newName;
+                    refreshAllViews();
+                    showToast('File renamed');
+                }
+                closeModal();
+            };
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+            modalCallback = null;
+        }
+
+        function confirmModal() {
+            if (modalCallback) modalCallback();
+        }
+
+        function downloadFile(file) {
+            // Simulated download
+            const blob = new Blob([file.content || ''], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = file.src || url;
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('Downloading...');
+        }
+
+        async function shareFile(file) {
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: file.name,
+                        text: 'Check out this file from Aether OS',
+                        url: window.location.href // Simulating
+                    });
+                } catch (err) {
+                   // User cancelled
+                }
+            } else {
+                navigator.clipboard.writeText(file.name);
+                showToast('Filename copied to clipboard');
+            }
+        }
+
+        // --- Auto Organize ---
+        function autoOrganize() {
+            let moved = 0;
+            allFiles.forEach(file => {
+                if (file.folderId === 'desktop') {
+                    let target = 'misc';
+                    if (file.type === 'doc') target = 'docs';
+                    if (file.type === 'image') target = 'imgs';
+                    if (file.type === 'code') target = 'code';
+                    file.folderId = target;
+                    moved++;
+                }
+            });
+            refreshAllViews();
+            if (moved > 0) showToast(`Organized ${moved} files`);
+            else showToast('Desktop is already clean');
+        }
+
+        // --- Utilities ---
+        function getIconForType(type) {
+            switch(type) {
+                case 'doc': return 'ph-file-text';
+                case 'image': return 'ph-image';
+                case 'code': return 'ph-code';
+                default: return 'ph-file';
+            }
+        }
+
+        function startDrag(e, elementId) {
+            const el = document.getElementById(elementId);
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            e.preventDefault();
+            pos3 = e.clientX;
+            pos4 = e.clientY;
+            
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
+            bringToFront(el);
+
+            function elementDrag(e) {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                el.style.top = (el.offsetTop - pos2) + "px";
+                el.style.left = (el.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+            }
+        }
+
+        function bringToFront(el) {
+            el.style.zIndex = ++zIndexCounter;
+        }
+
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `glass-panel px-4 py-3 rounded-xl flex items-center gap-3 shadow-2xl border-l-4 border-l-green-500 toast transition-all duration-300`;
+            toast.innerHTML = `<span class="text-sm font-medium text-white/90">${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function handleFileUpload(input) {
+            const files = Array.from(input.files);
+            processNewFiles(files, 'desktop');
+            input.value = '';
+        }
+
+        function processNewFiles(fileList, targetId) {
+            let count = 0;
+            fileList.forEach(f => {
+                count++;
+                const isImage = f.type.startsWith('image/');
+                const isText = f.type.startsWith('text/') || f.name.endsWith('.js') || f.name.endsWith('.css');
+                
+                let type = 'misc';
+                if(isImage) type = 'image';
+                else if(isText) type = f.name.endsWith('.js') || f.name.endsWith('.css') ? 'code' : 'doc';
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    allFiles.push({
+                        id: Date.now() + Math.random(),
+                        folderId: targetId,
+                        name: f.name,
+                        type: type,
+                        size: (f.size / 1024).toFixed(1) + ' KB',
+                        src: isImage ? e.target.result : null,
+                        content: isText ? e.target.result : null
+                    });
+                    refreshAllViews();
+                };
+                
+                if (isImage) reader.readAsDataURL(f);
+                else if (isText) reader.readAsText(f);
+                else {
+                    allFiles.push({
+                         id: Date.now() + Math.random(),
+                         folderId: targetId,
+                         name: f.name,
+                         type: type,
+                         size: (f.size / 1024).toFixed(1) + ' KB'
+                    });
+                    refreshAllViews();
+                }
+            });
+            if(count > 0) showToast(`${count} files imported`);
+        }
+        
+        function resetDemo() { location.reload(); }
+    </script>
+</body>
+</html>
